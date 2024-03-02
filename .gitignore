@@ -1,0 +1,37 @@
+# Node.js files
+node_modules/
+
+# Next.js build directory
+.next/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.DS_Store
+
+# Environment variables
+.env*
+
+# Cache and logs
+*.log
+logs
+*.seed
+*.pid
+*.rss
+
+# Dependency directories
+bower_components/
+
+# Distribution directories
+dist/
+out/
+build/
+
+# OS generated files
+.DS_Store
+Thumbs.db
