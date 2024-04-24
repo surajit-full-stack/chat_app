@@ -11,6 +11,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import { Friend } from "@/types/type";
 import { Avatar, ListItemText } from "@mui/material";
 import ChatMenu from "./Menu";
+import moment from "moment";
 
 const Search = styled("div")(({ theme }) => ({
   position: "relative",
@@ -52,8 +53,13 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }));
 
-export default function TopBar({ friendInfo }: { friendInfo: Friend }) {
+export default function TopBar({
+  friendInfo,
+}: {
+  friendInfo: Friend | undefined;
+}) {
   // const {userName,lastMsg,profilePicture,userId}=friendInfo
+  console.log("friendInfo", friendInfo);
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
@@ -65,9 +71,15 @@ export default function TopBar({ friendInfo }: { friendInfo: Friend }) {
             aria-label="open drawer"
             sx={{ mr: 2 }}
           >
-            <Avatar alt={friendInfo?.userName} src={friendInfo?.profilePicture} />
+            <Avatar
+              alt={friendInfo?.userName}
+              src={friendInfo?.profilePicture}
+            />
           </IconButton>
-          <ListItemText primary={friendInfo?.userName} secondary={friendInfo?.lastMsg} />
+          <ListItemText
+            primary={friendInfo?.userName}
+            secondary={friendInfo?.lastMsg ? moment(friendInfo.lastMsg).fromNow() : ""}
+          />
           <Search>
             <SearchIconWrapper>
               <SearchIcon />

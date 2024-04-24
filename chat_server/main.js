@@ -87,7 +87,9 @@ if (cluster.isMaster) {
       kafkaProducer.send({
         topic: "chat",
         messages: [{ value: JSON.stringify(message_packet) }],
-      });
+      }).then(it=>{
+        console.log('it', it)
+      })
     });
     socket.on("disconnect", () => {
       console.log("Client disconnected", socket.userId);

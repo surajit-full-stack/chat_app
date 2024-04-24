@@ -1,4 +1,4 @@
-'use client'
+"use client";
 import * as React from "react";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -10,18 +10,24 @@ import { useRouter } from "next/navigation";
 
 export default function FriendList({ friends }: { friends: Array<Friend> }) {
   const router = useRouter();
+  console.log('friends', friends)
   const startChat = (user: Friend) => {
-
-    router.push(`/conversation/${user.userName}`);
+    router.push(`/conversation/${user.userName}?c=${user.conversation_id}`);
   };
   return (
     <List sx={{ width: "100%", maxWidth: 360, bgcolor: "background.paper" }}>
-      {friends.map(({ userId, userName, profilePicture, lastMsg }) => {
+      {friends.map(({ userId, userName, profilePicture, lastMsg ,conversation_id}) => {
         return (
           <ListItem
-            sx={{ cursor: "pointer" }}
+            key={userName}
+            sx={{
+              cursor: "pointer",
+              "&:hover": {
+                background: "#5356FF",
+              },
+            }}
             onClick={() =>
-              startChat({ userId, userName, profilePicture, lastMsg })
+              startChat({ userId, userName, profilePicture, lastMsg,conversation_id })
             }
           >
             <ListItemAvatar>

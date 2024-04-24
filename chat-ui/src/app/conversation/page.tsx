@@ -17,6 +17,8 @@ import { v4 as uuidv4 } from "uuid";
 import _socket from "@/socket";
 import { reactLocalStorage } from "reactjs-localstorage";
 import moment from "moment";
+import { friendStore } from "@/cache/friendsStore";
+import { useSearchParams } from "next/navigation";
 export const mainTheme = createTheme({
   palette: {
     mode: "dark",
@@ -24,14 +26,20 @@ export const mainTheme = createTheme({
 });
 
 const index = ({ params: { friendId } }: { params: Params }) => {
-  const [friends, setFriends] = useState<Array<Friend>>([]);
-
+  const { friends, updateFriends } = friendStore();
+  const query = useSearchParams();
+  console.log("ss", query.get("c"));
   useEffect(() => {
+    if (friends) return;
     http.get("get-following/", { withCredentials: true }).then(({ data }) => {
       console.log("datsssssa", data);
-      setFriends(() => {
-        return data.map((it: Friend) => ({ ...it, lastMsg: null }));
-      });
+      updateFriends(
+        data.map((it: any) => ({
+          ...it,
+          lastMsg: null,
+          conversation_id: it.id,
+        }))
+      );
     });
   }, []);
 
@@ -69,6 +77,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       time: moment(),
       id: uuidv4(),
       status: "offline",
+      conversation_id: query.get("c") as string,
     };
     socket?.emit("new-msg", payload);
     setMessages((prev) => [...prev, { ...payload, status: "offline" }]);
@@ -85,7 +94,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
           <Grid sx={{ borderRight: "1px solid black" }} item xs={3}>
             <TopBar />
             <Box sx={{ maxHeight: "calc(100vh - 64px)", overflowY: "auto" }}>
-              <FriendList friends={friends} />
+              <FriendList friends={friends ?? []} />
             </Box>
           </Grid>
           {friendId ? (
@@ -98,7 +107,9 @@ const index = ({ params: { friendId } }: { params: Params }) => {
                 }}
               >
                 <Grid sx={{ flex: "1 0 1/12" }}>
-                  <ChatTopBar friendInfo={friends[0]} />
+                  <ChatTopBar
+                    friendInfo={friends?.find((fr) => fr.userName === friendId)}
+                  />
                 </Grid>
 
                 <Grid
