@@ -12,7 +12,7 @@ export default function FriendList({ friends }: { friends: Array<Friend> }) {
   const router = useRouter();
   console.log('friends', friends)
   const startChat = (user: Friend) => {
-    router.push(`/conversation/${user.userName}?c=${user.conversation_id}`);
+    router.push(`/conversation/${user.userName}`);
   };
   return (
     <List sx={{ width: "100%", maxWidth: 360, bgcolor: "background.paper" }}>

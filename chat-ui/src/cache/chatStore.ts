@@ -2,9 +2,13 @@ import { Friend, Message } from "@/types/type";
 import { StateCreator, create } from "zustand";
 import { PersistOptions, persist } from "zustand/middleware";
 
+type ChatBase = {
+  [key: string]: Array<Message>;
+};
 type CacheData = {
-  chats: Array<Message> | null;
-  updateChats: (chats: Array<Message>) => void;
+  chats: ChatBase;
+  updateChats: (convId: string, chats: Array<Message> | Message) => void;
+  getChats: (convId: string) => Array<Message>;
 };
 
 type MyPersist = (
@@ -14,18 +18,29 @@ type MyPersist = (
 
 export const cacheStore = create<CacheData>(
   (persist as MyPersist)(
-    (set) => ({
-     
-      chats: null,
-     
-      updateChats: (chats) => {
-        set({ chats });
+    (set, get) => ({
+      chats: {},
+
+      updateChats: (convId, chats) => {
+        if (Array.isArray(chats)) {
+          console.log("rewrite");
+          set((state) => ({ chats: { [convId]: chats } }));
+        } else {
+          console.log("push");
+
+          const prev = get().chats[convId] ?? [];
+          const curr = [...prev, chats];
+          set((state) => ({ chats: { ...state.chats, [convId]: curr } }));
+        }
+      },
+      getChats: (convId) => {
+        const data = get().chats;
+        return data[convId] ?? [];
       },
     }),
     {
       name: "chat-store",
-      getStorage: () => sessionStorage,
-      
+      getStorage: () => localStorage,
     }
   )
 );

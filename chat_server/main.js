@@ -62,7 +62,7 @@ if (cluster.isMaster) {
 
   // Kafka Producer
   try {
-    await kafkaInit()
+    await kafkaInit();
     console.log("\nKafka Initiated  chat server...\n");
   } catch (error) {
     console.log("\nKafka Init Error: \n", error);
@@ -84,20 +84,20 @@ if (cluster.isMaster) {
     socket.on("new-msg", (message_packet) => {
       console.log("first", message_packet);
 
-      kafkaProducer.send({
-        topic: "chat",
-        messages: [{ value: JSON.stringify(message_packet) }],
-      }).then(it=>{
-        console.log('it', it)
-      })
+      kafkaProducer
+        .send({
+          topic: "chat",
+          messages: [{ value: JSON.stringify(message_packet) }],
+        })
+        .then((it) => {
+          console.log("it", it);
+        });
     });
     socket.on("disconnect", () => {
       console.log("Client disconnected", socket.userId);
       socketIds.delete(socket.userId);
     });
   });
-
-
 
   await chat_consumer.run({
     eachMessage: async ({ topic: channel, message: rawMessage }) => {
@@ -107,12 +107,13 @@ if (cluster.isMaster) {
       try {
         if (channel == "ACK") {
           const ack_packet = JSON.parse(message);
-          const { userId, message_id, level } = ack_packet;
+          const { userId, message_id, level, conversation_id } = ack_packet;
           const messager_socket_id = socketIds.get(userId);
           if (messager_socket_id) {
             io.to(messager_socket_id).emit("acknowledgment", {
               level,
               message_id,
+              conversation_id,
             });
           }
         } else {
@@ -129,6 +130,7 @@ if (cluster.isMaster) {
             acknowledgment(
               message_packet.senderName,
               message_packet.id,
+              message_packet.conversation_id,
               "sent"
             );
           } else {
@@ -146,11 +148,17 @@ if (cluster.isMaster) {
   });
 
   // message acknowledgement
-  function acknowledgment(userId, message_id, level) {
+  function acknowledgment(userId, message_id, conversation_id, level) {
     kafkaProducer.send({
       topic: "ACK",
-      messages: [{ value: JSON.stringify({ userId, message_id, level }) }],
-    });
+      messages: [
+        {
+          value: JSON.stringify({ userId, message_id, conversation_id, level }),
+        },
+      ],
+    }).then(ack=>{
+      console.log('ack snt', ack)
+    })
   }
 
   // Create Redis client here

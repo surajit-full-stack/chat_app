@@ -5,7 +5,12 @@ const port =
 
 const serverUrl = `${process.env.NEXT_PUBLIC_CHAT_SOCKET_SERVER_HOST}:${port}`;
 
-const _socket = io(serverUrl);
 const userData = reactLocalStorage.getObject("userData") as any;
-_socket.emit("join-chat", { userId: userData.userName });
+const _socket = io(serverUrl);
+console.log('userData', userData)
+if ( userData.userName) {
+  _socket.emit("join-chat", { userId: userData.userName });
+} else {
+  alert("Socket identity failed");
+}
 export default _socket;

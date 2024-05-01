@@ -18,7 +18,9 @@ import _socket from "@/socket";
 import { reactLocalStorage } from "reactjs-localstorage";
 import moment from "moment";
 import { friendStore } from "@/cache/friendsStore";
+import { cacheStore } from "@/cache/chatStore";
 import { useSearchParams } from "next/navigation";
+
 export const mainTheme = createTheme({
   palette: {
     mode: "dark",
@@ -26,50 +28,89 @@ export const mainTheme = createTheme({
 });
 
 const index = ({ params: { friendId } }: { params: Params }) => {
-  const { friends, updateFriends } = friendStore();
+  const { friends, updateFriends, updatecnvIds, conversation_ids } =
+    friendStore();
+  const { getChats, updateChats } = cacheStore();
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const query = useSearchParams();
   console.log("ss", query.get("c"));
   useEffect(() => {
+    if (friendId) {
+      console.log("conversation_ids", conversation_ids);
+      const cache_conv_id = conversation_ids[friendId];
+      if (cache_conv_id) {
+        setConversationId(cache_conv_id);
+        const sessionState = !sessionStorage.getItem("FREASH");
+        if (sessionState) {
+          sessionStorage.setItem("FREASH", "true");
+          getConversation(cache_conv_id);
+        }
+      } else {
+        http
+          .get("get-conversationId/" + friendId, { withCredentials: true })
+          .then(({ data: { conversation_id } }) => {
+            updatecnvIds(friendId, conversation_id);
+            setConversationId(conversation_id);
+            getConversation(conversation_id);
+          });
+      }
+    }
     if (friends) return;
     http.get("get-following/", { withCredentials: true }).then(({ data }) => {
-      console.log("datsssssa", data);
       updateFriends(
-        data.map((it: any) => ({
-          ...it,
-          lastMsg: null,
-          conversation_id: it.id,
-        }))
+        data.map((it: any) => {
+          return {
+            ...it,
+            lastMsg: null,
+          };
+        })
       );
     });
   }, []);
-
+  async function getConversation(cnvId: string) {
+    try {
+      // const fetchedMsgCount = getChats(cnvId).length;
+      // `?skip=${fetchedMsgCount}`
+      const { data } = await http.get("conversations/" + cnvId, {
+        withCredentials: true,
+      });
+      updateChats(cnvId, data.msg);
+      setMessages(data.msg);
+    } catch (error) {
+      alert("check error");
+    }
+  }
   const userData = reactLocalStorage.getObject("userData") as any;
   const [messages, setMessages] = useState<Array<Message>>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
+    if (!_socket) return alert("your id unauthorized");
     setSocket(_socket);
 
     _socket.removeAllListeners("new-message");
     _socket.on("new-message", (msg) => {
       console.log("msg recieved", msg);
-      setMessages((prev) => [...prev, ...msg.message]);
+      const singleMsg = msg.message[0];
+      updateChats(singleMsg.conversation_id, singleMsg);
     });
-    _socket.on("acknowledgment", ({ level, message_id }) => {
-      console.log("hh", level, message_id);
+    _socket.on("acknowledgment", ({ level, message_id, conversation_id }) => {
+      console.log("hh", level, message_id, conversation_id);
 
-      setMessages((prev) => {
-        return prev.map((it) => {
-          if (it.id === message_id) {
-            return { ...it, status: level };
-          }
-          return it;
-        });
+      let prev = getChats(conversation_id);
+      const updatedStatus = prev.map((it) => {
+        if (it.id === message_id) {
+          return { ...it, status: level };
+        }
+        return it;
       });
+      updateChats(conversation_id,updatedStatus)
+
     });
   }, []);
 
   const sendMsg = (msg: string) => {
+    if (!conversationId) return alert("Connection id missing");
     const payload: Message = {
       receiverName: friendId,
       text: msg,
@@ -77,15 +118,21 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       time: moment(),
       id: uuidv4(),
       status: "offline",
-      conversation_id: query.get("c") as string,
+      conversation_id: conversationId as string,
     };
     socket?.emit("new-msg", payload);
+
+    updateChats(conversationId, { ...payload, status: "offline" });
+
     setMessages((prev) => [...prev, { ...payload, status: "offline" }]);
   };
   console.log("messeges", messages);
   const onMessageEnter = (message: string) => {
     if (!!message) sendMsg(message);
   };
+
+  console.log("conversationId", conversationId);
+
   return (
     <ThemeProvider theme={mainTheme}>
       <CssBaseline />
@@ -118,7 +165,9 @@ const index = ({ params: { friendId } }: { params: Params }) => {
                     overflowY: "auto",
                   }}
                 >
-                  <Conversation messages={messages} />
+                  <Conversation
+                    messages={conversationId ? getChats(conversationId) : []}
+                  />
                 </Grid>
 
                 <Grid

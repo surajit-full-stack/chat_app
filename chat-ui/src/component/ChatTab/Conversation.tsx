@@ -35,108 +35,113 @@ const Conversation = ({ messages }: ConverSationProps) => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!searchMessage) {
+      const element = document.getElementById("end");
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  }, [messages]);
+
   return (
     <Box sx={{ width: "100%", height: "auto" }}>
-     
-        {messages.length > 0 && (
-          <Box
-            sx={{
-              pt: 2,
-              width: "100%",
-              display: "flex",
-              justifyContent: "center",
-            }}
+      {messages.length > 0 && (
+        <Box
+          sx={{
+            pt: 2,
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            display="flex"
+            justifyContent="end"
+            alignItems="center"
           >
-            <Typography
-              variant="caption"
-              color="textSecondary"
+            {" "}
+            {moment(messages[0].time).format("ll")}
+          </Typography>
+        </Box>
+      )}
+      {messages.map(({ text, senderName, time: rawTime, status, id }, ind) => {
+        const time = moment(rawTime);
+
+        const isMe = senderName === me;
+        const textBox = isMe ? myTextBox : remoteTextBox;
+        const backgroundColor =
+          searchMessage.substring(1) === id
+            ? mainTheme.palette.success.dark
+            : isMe
+            ? alpha(mainTheme.palette.success.dark, 0.45)
+            : alpha(mainTheme.palette.common.white, 0.07);
+        return (
+          <Stack spacing={1}>
+            {" "}
+            <Box
               display="flex"
-              justifyContent="end"
+              justifyContent={isMe ? "end" : "start"}
               alignItems="center"
+              component="div"
             >
-              {" "}
-              {moment(messages[0].time).format("ll")}
-            </Typography>
-          </Box>
-        )}
-        {messages.map(
-          ({ text, senderName, time: rawTime, status, id }, ind) => {
-            const time = moment(rawTime);
+              <Typography
+                variant="subtitle2"
+                gutterBottom
+                sx={{
+                  backgroundColor,
+                  p: 2,
+                  mx: 2,
+                  my: 1,
+                  maxWidth: "70%",
 
-            const isMe = senderName === me;
-            const textBox = isMe ? myTextBox : remoteTextBox;
-            const backgroundColor =
-              searchMessage.substring(1) === id
-                ? mainTheme.palette.success.dark
-                : isMe
-                ? alpha(mainTheme.palette.success.dark, 0.45)
-                : alpha(mainTheme.palette.common.white, 0.07);
-            return (
-              <Stack spacing={1}>
-                {" "}
-                <Box
+                  ...textBox,
+                }}
+              >
+                {text}
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
                   display="flex"
-                  justifyContent={isMe ? "end" : "start"}
+                  justifyContent="end"
                   alignItems="center"
-                  component="div"
-                 
                 >
-                  <Typography
-                    variant="subtitle2"
-                    gutterBottom
-                    sx={{
-                      backgroundColor,
-                      p: 2,
-                      mx: 2,
-                      my: 1,
-                      maxWidth:'70%',
-                    
-                      ...textBox,
-                    }}
-                  >
-                    {text}
-                    <Typography
-                      variant="caption"
-                      color="textSecondary"
-                      display="flex"
-                      justifyContent="end"
-                      alignItems="center"
-                    >
-                      {time.format("hh:mm a")}
+                  {time.format("hh:mm a")}
 
-                      {isMe ? (
-                        status === "seen" ? (
-                          <DoneAllIcon color="info" sx={statusStyle} />
-                        ) : status === "sent" ? (
-                          <DoneAllIcon sx={statusStyle} />
-                        ) : (
-                          <DoneIcon sx={statusStyle} />
-                        )
-                      ) : null}
-                    </Typography>
+                  {isMe ? (
+                    status === "seen" ? (
+                      <DoneAllIcon color="info" sx={statusStyle} />
+                    ) : status === "sent" ? (
+                      <DoneAllIcon sx={statusStyle} />
+                    ) : (
+                      <DoneIcon sx={statusStyle} />
+                    )
+                  ) : null}
+                </Typography>
+              </Typography>
+            </Box>
+            {ind + 1 < messages.length &&
+              !time.isSame(moment(messages[ind + 1].time), "day") && (
+                <Divider sx={{ px: 20 }} variant="middle">
+                  <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    display="flex"
+                    justifyContent="end"
+                    alignItems="center"
+                  >
+                    {" "}
+                    {moment(messages[ind + 1].time).format("ll")}
                   </Typography>
-                </Box>
-                {ind + 1 < messages.length &&
-                  !time.isSame(moment(messages[ind + 1].time), "day") && (
-                    <Divider sx={{ px: 20 }} variant="middle">
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        display="flex"
-                        justifyContent="end"
-                        alignItems="center"
-                      >
-                        {" "}
-                        {moment(messages[ind + 1].time).format("ll")}
-                      </Typography>
-                    </Divider>
-                  )}
-                <div id={id}></div>
-                </Stack>
-            );
-          }
-        )}
-     
+                </Divider>
+              )}
+            <div id={id}></div>
+          </Stack>
+        );
+      })}
+      <div id="end"></div>
     </Box>
   );
 };
