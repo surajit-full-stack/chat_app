@@ -30,10 +30,18 @@ export const mainTheme = createTheme({
 const index = ({ params: { friendId } }: { params: Params }) => {
   const { friends, updateFriends, updatecnvIds, conversation_ids } =
     friendStore();
-  const { getChats, updateChats } = cacheStore();
+  const { getChats, updateChats, markMsgAsSeen } = cacheStore();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const query = useSearchParams();
   console.log("ss", query.get("c"));
+
+  useEffect(() => {
+    if (conversationId) {
+      let data = getChats(conversationId);
+      seeMesages(data)
+    }
+  }, [conversationId]);
+
   useEffect(() => {
     if (friendId) {
       console.log("conversation_ids", conversation_ids);
@@ -76,8 +84,22 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       });
       updateChats(cnvId, data.msg);
       setMessages(data.msg);
+      seeMesages(data.msg);
     } catch (error) {
       alert("check error");
+    }
+  }
+  async function seeMesages(fetchedMsgs: Message[]) {
+    const unseenMsgs = fetchedMsgs.map((it) => {
+      if (it.status != "seen" && it.senderName == friendId) {
+        return { senderName: it.senderName, reciverName: it.receiverName };
+      }
+    });
+    if (unseenMsgs.length > 0) {
+      _socket?.emit("seen-msg", {
+        reciverName: unseenMsgs[0]?.reciverName,
+        senderName: unseenMsgs[0]?.senderName,
+      });
     }
   }
   const userData = reactLocalStorage.getObject("userData") as any;
@@ -87,12 +109,13 @@ const index = ({ params: { friendId } }: { params: Params }) => {
   useEffect(() => {
     if (!_socket) return alert("your id unauthorized");
     setSocket(_socket);
-
+    console.log("_socket.id", _socket);
     _socket.removeAllListeners("new-message");
-    _socket.on("new-message", (msg) => {
+    _socket.on("new-message", (msg: any) => {
       console.log("msg recieved", msg);
       const singleMsg = msg.message[0];
       updateChats(singleMsg.conversation_id, singleMsg);
+      seeMesages(msg.message);
     });
     _socket.on("acknowledgment", ({ level, message_id, conversation_id }) => {
       console.log("hh", level, message_id, conversation_id);
@@ -104,8 +127,12 @@ const index = ({ params: { friendId } }: { params: Params }) => {
         }
         return it;
       });
-      updateChats(conversation_id,updatedStatus)
-
+      updateChats(conversation_id, updatedStatus);
+    });
+    _socket.on("friend-seen-msgs", ({ friendId }) => {
+      const cache_conv_id = conversation_ids[friendId];
+      console.log("cache_conv_id", cache_conv_id);
+      markMsgAsSeen(cache_conv_id);
     });
   }, []);
 

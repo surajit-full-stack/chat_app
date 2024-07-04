@@ -8,6 +8,7 @@ type ChatBase = {
 type CacheData = {
   chats: ChatBase;
   updateChats: (convId: string, chats: Array<Message> | Message) => void;
+  markMsgAsSeen: (convId: string) => void;
   getChats: (convId: string) => Array<Message>;
 };
 
@@ -24,7 +25,9 @@ export const cacheStore = create<CacheData>(
       updateChats: (convId, chats) => {
         if (Array.isArray(chats)) {
           console.log("rewrite");
-          set((state) => ({ chats: { [convId]: chats } }));
+          set((state) => ({
+            chats: { [convId]: chats },
+          }));
         } else {
           console.log("push");
 
@@ -33,6 +36,18 @@ export const cacheStore = create<CacheData>(
           set((state) => ({ chats: { ...state.chats, [convId]: curr } }));
         }
       },
+      markMsgAsSeen: (convId) => {
+        set((state) => ({
+          chats: {
+            ...state.chats,
+            [convId]: get().chats[convId].map((it) => ({
+              ...it,
+              status: "seen",
+            })),
+          },
+        }));
+      },
+
       getChats: (convId) => {
         const data = get().chats;
         return data[convId] ?? [];

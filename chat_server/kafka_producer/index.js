@@ -1,5 +1,5 @@
 import { Kafka } from "kafkajs";
-import dotenv from "dotenv"
+import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 // const kafka = new Kafka({
@@ -15,12 +15,13 @@ import path from "path";
 //     mechanism: "plain",
 //   },
 // });
-dotenv.config()
-console.log('process.env.KAFKA_BROKER', process.env.KAFKA_BROKER)
+dotenv.config();
+console.log("process.env.KAFKA_BROKER", process.env.KAFKA_BROKER);
 const kafka = new Kafka({
   clientId: "chat-server",
   brokers: [process.env.KAFKA_BROKER],
 });
+
 export const producer = kafka.producer();
 export const chat_consumer = kafka.consumer({
   groupId: "real-time-chat-consume" + process.env.PORT,
@@ -39,14 +40,16 @@ export const kafkaInit = async () => {
         {
           topic: "ACK",
         },
+        {
+          topic: "seen-msg",
+        },
       ],
     });
     await admin.disconnect();
     await producer.connect();
     await chat_consumer.connect();
-    console.log("\n\prod con connected\n\n")
-    await chat_consumer.subscribe({ topics: ["chat","ACK"] }); 
- 
+    console.log("\nprod con connected\n\n");
+    await chat_consumer.subscribe({ topics: ["chat", "ACK","seen-msg"] });
   } catch (error) {
     throw error;
   }

@@ -73,7 +73,14 @@ if (cluster.isMaster) {
   io.on("connection", (socket) => {
     socket.on("join-chat", ({ userId }) => {
       console.log("++++", userId);
-
+      // kafkaProducer
+      // .send({
+      //   topic: "user-online-status",
+      //   messages: [{ value: userId }],
+      // })
+      // .then((it) => {
+      //   console.log("it", it);
+      // });
       socketIds.set(userId, socket.id);
       console.log("socketIds", socketIds);
       socket.userId = userId;
@@ -93,6 +100,12 @@ if (cluster.isMaster) {
           console.log("it", it);
         });
     });
+    socket.on("seen-msg", ({ senderName, reciverName }) => {
+      kafkaProducer.send({
+        topic: "seen-msg",
+        messages: [{ value: JSON.stringify({ senderName, reciverName }) }],
+      });
+    });
     socket.on("disconnect", () => {
       console.log("Client disconnected", socket.userId);
       socketIds.delete(socket.userId);
@@ -106,6 +119,7 @@ if (cluster.isMaster) {
       // bulk insert payload => batch.messages.map((it) => JSON.parse(it.value))
       try {
         if (channel == "ACK") {
+          console.log("oooo");
           const ack_packet = JSON.parse(message);
           const { userId, message_id, level, conversation_id } = ack_packet;
           const messager_socket_id = socketIds.get(userId);
@@ -116,7 +130,18 @@ if (cluster.isMaster) {
               conversation_id,
             });
           }
-        } else {
+        } else if (channel == "seen-msg") {
+          console.log("Processing seen-msg message");
+          const message_packet = JSON.parse(message);
+       
+
+          const { reciverName, senderName } = message_packet;
+          const senderSocketId = socketIds.get(senderName);
+          console.log("senderSocketId", senderSocketId);
+          io.to(senderSocketId).emit("friend-seen-msgs", {
+            friendId: reciverName,
+          });
+        } else if (channel == "chat") {
           const message_packet = JSON.parse(message);
           const { receiverName } = message_packet;
           let _status = "offline";
@@ -149,16 +174,23 @@ if (cluster.isMaster) {
 
   // message acknowledgement
   function acknowledgment(userId, message_id, conversation_id, level) {
-    kafkaProducer.send({
-      topic: "ACK",
-      messages: [
-        {
-          value: JSON.stringify({ userId, message_id, conversation_id, level }),
-        },
-      ],
-    }).then(ack=>{
-      console.log('ack snt', ack)
-    })
+    kafkaProducer
+      .send({
+        topic: "ACK",
+        messages: [
+          {
+            value: JSON.stringify({
+              userId,
+              message_id,
+              conversation_id,
+              level,
+            }),
+          },
+        ],
+      })
+      .then((ack) => {
+        console.log("ack snt", ack);
+      });
   }
 
   // Create Redis client here
