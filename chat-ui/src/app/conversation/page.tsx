@@ -30,15 +30,26 @@ export const mainTheme = createTheme({
 const index = ({ params: { friendId } }: { params: Params }) => {
   const { friends, updateFriends, updatecnvIds, conversation_ids } =
     friendStore();
-  const { getChats, updateChats, markMsgAsSeen } = cacheStore();
+  const { getChats, updateChats, markMsgAsSeen, markMsgAsSent } = cacheStore();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const query = useSearchParams();
-  console.log("ss", query.get("c"));
+
+  function storeTimestamp() {
+    const timestamp = new Date().toISOString();
+    localStorage.setItem("lastOnline", timestamp);
+  }
+
+  useEffect(() => {
+    window.addEventListener("beforeunload", storeTimestamp);
+
+    return () => {
+      window.removeEventListener("beforeunload", storeTimestamp);
+    };
+  });
 
   useEffect(() => {
     if (conversationId) {
-      let data = getChats(conversationId);
-      seeMesages(data)
+      getConversation(conversationId);
     }
   }, [conversationId]);
 
@@ -48,33 +59,40 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       const cache_conv_id = conversation_ids[friendId];
       if (cache_conv_id) {
         setConversationId(cache_conv_id);
-        const sessionState = !sessionStorage.getItem("FREASH");
-        if (sessionState) {
-          sessionStorage.setItem("FREASH", "true");
-          getConversation(cache_conv_id);
-        }
       } else {
         http
           .get("get-conversationId/" + friendId, { withCredentials: true })
           .then(({ data: { conversation_id } }) => {
             updatecnvIds(friendId, conversation_id);
             setConversationId(conversation_id);
-            getConversation(conversation_id);
           });
       }
     }
-    if (friends) return;
+    if (friends) {
+      return meOnline(friends);
+    }
     http.get("get-following/", { withCredentials: true }).then(({ data }) => {
-      updateFriends(
-        data.map((it: any) => {
-          return {
-            ...it,
-            lastMsg: null,
-          };
-        })
-      );
+      const prepFriends = data.map((it: any) => {
+        return {
+          ...it,
+          lastMsg: null,
+        };
+      });
+      updateFriends(prepFriends);
+      meOnline(prepFriends);
     });
   }, []);
+  function meOnline(friends: Friend[]) {
+    // will be called later when unseen msg count api will be implemented
+    const sessionState = !sessionStorage.getItem("FREASH");
+    if (sessionState) {
+      _socket.emit("me-online", {
+        broadcastIds: friends.map((it) => it.userName),
+        onlineUser:userData.userName
+      });
+      sessionStorage.setItem("FREASH", "true");
+    }
+  }
   async function getConversation(cnvId: string) {
     try {
       // const fetchedMsgCount = getChats(cnvId).length;
@@ -90,14 +108,15 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     }
   }
   async function seeMesages(fetchedMsgs: Message[]) {
-    const unseenMsgs = fetchedMsgs.map((it) => {
+    const unseenMsgs = fetchedMsgs.filter((it) => {
       if (it.status != "seen" && it.senderName == friendId) {
         return { senderName: it.senderName, reciverName: it.receiverName };
       }
     });
+    console.log("unseenMsgs", unseenMsgs);
     if (unseenMsgs.length > 0) {
       _socket?.emit("seen-msg", {
-        reciverName: unseenMsgs[0]?.reciverName,
+        reciverName: unseenMsgs[0]?.receiverName,
         senderName: unseenMsgs[0]?.senderName,
       });
     }
@@ -107,6 +126,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
+    console.log("ooooooooooooo");
     if (!_socket) return alert("your id unauthorized");
     setSocket(_socket);
     console.log("_socket.id", _socket);
@@ -131,8 +151,25 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     });
     _socket.on("friend-seen-msgs", ({ friendId }) => {
       const cache_conv_id = conversation_ids[friendId];
-      console.log("cache_conv_id", cache_conv_id);
-      markMsgAsSeen(cache_conv_id);
+      if (!cache_conv_id) {
+        http
+          .get("get-conversationId/" + friendId, { withCredentials: true })
+          .then(({ data: { conversation_id } }) => {
+            markMsgAsSeen(conversation_id);
+          });
+      } else markMsgAsSeen(cache_conv_id);
+    });
+    _socket.on("friend-receive-msgs", ({ friendId }) => {
+      console.log('fr rcv msg')
+      const cache_conv_id = conversation_ids[friendId];
+      if (!cache_conv_id) {
+        http
+          .get("get-conversationId/" + friendId, { withCredentials: true })
+          .then(({ data: { conversation_id } }) => {
+            markMsgAsSent(conversation_id);
+          });
+      }
+      markMsgAsSent(cache_conv_id);
     });
   }, []);
 

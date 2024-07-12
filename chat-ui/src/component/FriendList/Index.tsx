@@ -16,7 +16,7 @@ export default function FriendList({ friends }: { friends: Array<Friend> }) {
   };
   return (
     <List sx={{ width: "100%", maxWidth: 360, bgcolor: "background.paper" }}>
-      {friends.map(({ userId, userName, profilePicture, lastMsg ,conversation_id}) => {
+      {friends.map(({ userId, userName, profilePicture, lastMsg }) => {
         return (
           <ListItem
             key={userName}
@@ -27,7 +27,7 @@ export default function FriendList({ friends }: { friends: Array<Friend> }) {
               },
             }}
             onClick={() =>
-              startChat({ userId, userName, profilePicture, lastMsg,conversation_id })
+              startChat({ userId, userName, profilePicture, lastMsg })
             }
           >
             <ListItemAvatar>

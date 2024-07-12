@@ -9,6 +9,7 @@ type CacheData = {
   chats: ChatBase;
   updateChats: (convId: string, chats: Array<Message> | Message) => void;
   markMsgAsSeen: (convId: string) => void;
+  markMsgAsSent: (convId: string) => void;
   getChats: (convId: string) => Array<Message>;
 };
 
@@ -44,6 +45,18 @@ export const cacheStore = create<CacheData>(
               ...it,
               status: "seen",
             })),
+          },
+        }));
+      },
+      markMsgAsSent: (convId) => {
+      
+        set((state) => ({
+          chats: {
+            ...state.chats,
+            [convId]: get().chats[convId].map((it) => {
+              if (it.status == "offline") return { ...it, status: "sent" };
+              else return it;
+            }),
           },
         }));
       },

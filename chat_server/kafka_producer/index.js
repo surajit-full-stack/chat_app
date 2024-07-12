@@ -43,13 +43,18 @@ export const kafkaInit = async () => {
         {
           topic: "seen-msg",
         },
+        {
+          topic: "seen-msg-db-write",
+        },
       ],
     });
     await admin.disconnect();
     await producer.connect();
     await chat_consumer.connect();
     console.log("\nprod con connected\n\n");
-    await chat_consumer.subscribe({ topics: ["chat", "ACK","seen-msg"] });
+    await chat_consumer.subscribe({
+      topics: ["chat", "ACK", "seen-msg", "seen-msg-db-write"],
+    });
   } catch (error) {
     throw error;
   }
