@@ -138,7 +138,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       updateChats(cnvId, data.msg);
       setMessages(data.msg);
       seeMesages(data.msg);
-    } catch (error) {
+    } catch (err) {
       if (err.response) {
         toast.error(err.response.data.msg);
       } else {
