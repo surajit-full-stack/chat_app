@@ -20,6 +20,8 @@ import moment from "moment";
 import { friendStore } from "@/cache/friendsStore";
 import { cacheStore } from "@/cache/chatStore";
 import { useSearchParams } from "next/navigation";
+import { AxiosError } from "axios";
+import toast, { Toaster } from "react-hot-toast";
 
 export const mainTheme = createTheme({
   palette: {
@@ -65,30 +67,63 @@ const index = ({ params: { friendId } }: { params: Params }) => {
           .then(({ data: { conversation_id } }) => {
             updatecnvIds(friendId, conversation_id);
             setConversationId(conversation_id);
+          })
+          .catch((err) => {
+            if (err.response) {
+              console.log("err", err.response.data.msg);
+              toast.error(err.response.data.msg);
+            } else {
+              toast.error(err.message);
+            }
           });
       }
     }
     if (friends) {
-      return meOnline(friends);
+      // refecthing all friend when visit non existing chat
+      if (!friends.find((fr) => fr.userName == friendId)) fetchFriends();
+      return meOnline(friends); // alert friends that im online
     }
-    http.get("get-following/", { withCredentials: true }).then(({ data }) => {
-      const prepFriends = data.map((it: any) => {
-        return {
-          ...it,
-          lastMsg: null,
-        };
-      });
-      updateFriends(prepFriends);
-      meOnline(prepFriends);
-    });
+    fetchFriends();
   }, []);
+  function fetchFriends() {
+    http
+      .get("participants/", { withCredentials: true })
+      .then(({ data }) => {
+        console.log("data", data);
+        const prepFriends = data.map((it: any) => {
+          const idfyFriend = it.participants.find(
+            (f: any) => f != userData.userName
+          );
+
+          const friendData = it.participants_data[idfyFriend] ?? {
+            userId: null,
+            userName: null,
+            profilePicture: null,
+          };
+          return {
+            ...friendData,
+            lastMsg: null,
+          };
+        });
+        updateFriends(prepFriends);
+        meOnline(prepFriends);
+      })
+      .catch((err) => {
+      
+        if (err.response) {
+          toast.error(err.response.data.msg);
+        } else {
+          toast.error(err.message);
+        }
+      });
+  }
   function meOnline(friends: Friend[]) {
     // will be called later when unseen msg count api will be implemented
     const sessionState = !sessionStorage.getItem("FREASH");
     if (sessionState) {
       _socket.emit("me-online", {
         broadcastIds: friends.map((it) => it.userName),
-        onlineUser:userData.userName
+        onlineUser: userData.userName,
       });
       sessionStorage.setItem("FREASH", "true");
     }
@@ -104,7 +139,11 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       setMessages(data.msg);
       seeMesages(data.msg);
     } catch (error) {
-      alert("check error");
+      if (err.response) {
+        toast.error(err.response.data.msg);
+      } else {
+        toast.error(err.message);
+      }
     }
   }
   async function seeMesages(fetchedMsgs: Message[]) {
@@ -160,7 +199,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       } else markMsgAsSeen(cache_conv_id);
     });
     _socket.on("friend-receive-msgs", ({ friendId }) => {
-      console.log('fr rcv msg')
+      console.log("fr rcv msg");
       const cache_conv_id = conversation_ids[friendId];
       if (!cache_conv_id) {
         http
@@ -198,70 +237,75 @@ const index = ({ params: { friendId } }: { params: Params }) => {
   console.log("conversationId", conversationId);
 
   return (
-    <ThemeProvider theme={mainTheme}>
-      <CssBaseline />
-      <Box sx={{ flexGrow: 1 }}>
-        <Grid container spacing={2}>
-          <Grid sx={{ borderRight: "1px solid black" }} item xs={3}>
-            <TopBar />
-            <Box sx={{ maxHeight: "calc(100vh - 64px)", overflowY: "auto" }}>
-              <FriendList friends={friends ?? []} />
-            </Box>
-          </Grid>
-          {friendId ? (
-            <Grid sx={{ pt: 2 }} xs={9}>
-              <Box
-                sx={{
-                  height: "100vh",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <Grid sx={{ flex: "1 0 1/12" }}>
-                  <ChatTopBar
-                    friendInfo={friends?.find((fr) => fr.userName === friendId)}
-                  />
-                </Grid>
-
-                <Grid
-                  sx={{
-                    flex: "1 1 auto",
-                    overflowY: "auto",
-                  }}
-                >
-                  <Conversation
-                    messages={conversationId ? getChats(conversationId) : []}
-                  />
-                </Grid>
-
-                <Grid
-                  sx={{
-                    flex: "1 0 1/12",
-                    backgroundColor: alpha(
-                      mainTheme.palette.common.white,
-                      0.07
-                    ),
-                    p: 1,
-                  }}
-                >
-                  <InputSection getInputValue={onMessageEnter} />
-                </Grid>
+    <>
+      <Toaster />
+      <ThemeProvider theme={mainTheme}>
+        <CssBaseline />
+        <Box sx={{ flexGrow: 1 }}>
+          <Grid container spacing={2}>
+            <Grid sx={{ borderRight: "1px solid black" }} item xs={3}>
+              <TopBar />
+              <Box sx={{ maxHeight: "calc(100vh - 64px)", overflowY: "auto" }}>
+                <FriendList friends={friends ?? []} />
               </Box>
             </Grid>
-          ) : (
-            <Grid
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              item
-              xs={9}
-            >
-              Start Chat
-            </Grid>
-          )}
-        </Grid>
-      </Box>
-    </ThemeProvider>
+            {friendId ? (
+              <Grid sx={{ pt: 2 }} xs={9}>
+                <Box
+                  sx={{
+                    height: "100vh",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <Grid sx={{ flex: "1 0 1/12" }}>
+                    <ChatTopBar
+                      friendInfo={friends?.find(
+                        (fr) => fr.userName === friendId
+                      )}
+                    />
+                  </Grid>
+
+                  <Grid
+                    sx={{
+                      flex: "1 1 auto",
+                      overflowY: "auto",
+                    }}
+                  >
+                    <Conversation
+                      messages={conversationId ? getChats(conversationId) : []}
+                    />
+                  </Grid>
+
+                  <Grid
+                    sx={{
+                      flex: "1 0 1/12",
+                      backgroundColor: alpha(
+                        mainTheme.palette.common.white,
+                        0.07
+                      ),
+                      p: 1,
+                    }}
+                  >
+                    <InputSection getInputValue={onMessageEnter} />
+                  </Grid>
+                </Box>
+              </Grid>
+            ) : (
+              <Grid
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                item
+                xs={9}
+              >
+                Start Chat
+              </Grid>
+            )}
+          </Grid>
+        </Box>
+      </ThemeProvider>
+    </>
   );
 };
 

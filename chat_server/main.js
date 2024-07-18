@@ -65,6 +65,7 @@ if (cluster.isMaster) {
     await kafkaInit();
     console.log("\nKafka Initiated  chat server...\n");
   } catch (error) {
+    throw error;
     console.log("\nKafka Init Error: \n", error);
   }
 
@@ -171,17 +172,19 @@ if (cluster.isMaster) {
           const message_packet = JSON.parse(message);
           const { senderName, receiverName } = message_packet;
           const _status = "offline";
+
           const destination_socket_id =
             message_packet.receiverSId ?? socketIds.get(receiverName);
           const sender_socket_id =
             message_packet.senderSId ?? socketIds.get(senderName);
+
           console.log("des", destination_socket_id, sender_socket_id);
           if (sender_socket_id && destination_socket_id) {
-            console.log('tw222222')
             io.to(sender_socket_id).emit("friend-receive-msgs", {
               friendId: receiverName,
             });
           }
+
           if (destination_socket_id) {
             _status = "sent";
             io.to(destination_socket_id).emit("new-message", {
