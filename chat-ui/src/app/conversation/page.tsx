@@ -22,6 +22,7 @@ import { cacheStore } from "@/cache/chatStore";
 import { useSearchParams } from "next/navigation";
 import { AxiosError } from "axios";
 import toast, { Toaster } from "react-hot-toast";
+import { getConversation } from "@/Axios/api";
 
 export const mainTheme = createTheme({
   palette: {
@@ -51,7 +52,10 @@ const index = ({ params: { friendId } }: { params: Params }) => {
 
   useEffect(() => {
     if (conversationId) {
-      getConversation(conversationId);
+      getConversation(conversationId).then((data) => {
+        setMessages(data);
+        seeMesages(data);
+      });
     }
   }, [conversationId]);
 
@@ -82,8 +86,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       // refecthing all friend when visit non existing chat
       if (!friends.find((fr) => fr.userName == friendId)) fetchFriends();
       return meOnline(friends); // alert friends that im online
-    }
-    fetchFriends();
+    } else fetchFriends();
   }, []);
   function fetchFriends() {
     http
@@ -99,6 +102,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
             userId: null,
             userName: null,
             profilePicture: null,
+            conversation_id: null,
           };
           return {
             ...friendData,
@@ -109,7 +113,6 @@ const index = ({ params: { friendId } }: { params: Params }) => {
         meOnline(prepFriends);
       })
       .catch((err) => {
-      
         if (err.response) {
           toast.error(err.response.data.msg);
         } else {
@@ -128,24 +131,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       sessionStorage.setItem("FREASH", "true");
     }
   }
-  async function getConversation(cnvId: string) {
-    try {
-      // const fetchedMsgCount = getChats(cnvId).length;
-      // `?skip=${fetchedMsgCount}`
-      const { data } = await http.get("conversations/" + cnvId, {
-        withCredentials: true,
-      });
-      updateChats(cnvId, data.msg);
-      setMessages(data.msg);
-      seeMesages(data.msg);
-    } catch (err) {
-      if (err.response) {
-        toast.error(err.response.data.msg);
-      } else {
-        toast.error(err.message);
-      }
-    }
-  }
+
   async function seeMesages(fetchedMsgs: Message[]) {
     const unseenMsgs = fetchedMsgs.filter((it) => {
       if (it.status != "seen" && it.senderName == friendId) {
@@ -246,7 +232,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
             <Grid sx={{ borderRight: "1px solid black" }} item xs={3}>
               <TopBar />
               <Box sx={{ maxHeight: "calc(100vh - 64px)", overflowY: "auto" }}>
-                <FriendList friends={friends ?? []} />
+                <FriendList/>
               </Box>
             </Grid>
             {friendId ? (

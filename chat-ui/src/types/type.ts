@@ -5,6 +5,7 @@ export type Friend = {
   userName: string;
   profilePicture: string;
   lastMsg: Moment | null;
+  conversation_id: string;
 };
 
 export type Message = {
@@ -14,5 +15,5 @@ export type Message = {
   time: Moment;
   status: "sent" | "offline" | "seen";
   id: string;
-  conversation_id:string
+  conversation_id: string;
 };
