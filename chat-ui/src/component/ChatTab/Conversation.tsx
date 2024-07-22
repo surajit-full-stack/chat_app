@@ -1,5 +1,5 @@
 "use client";
-import { mainTheme } from "@/app/conversation/page";
+
 import { Message } from "@/types/type";
 import { Box, Divider, Stack, Typography, alpha } from "@mui/material";
 import DoneIcon from "@mui/icons-material/Done";
@@ -7,6 +7,7 @@ import DoneAllIcon from "@mui/icons-material/DoneAll";
 import React, { useEffect, useState } from "react";
 import { reactLocalStorage } from "reactjs-localstorage";
 import moment from "moment";
+import { mainTheme } from "@/app/layout";
 type ConverSationProps = {
   messages: Array<Message>;
 };

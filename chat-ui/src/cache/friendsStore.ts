@@ -1,10 +1,13 @@
-import { Friend } from "@/types/type";
+import { Friend, Message } from "@/types/type";
+import moment, { Moment } from "moment";
 import { create, StateCreator } from "zustand";
 import { persist, PersistOptions } from "zustand/middleware";
 
 type CacheData = {
   friends: Array<Friend> | null;
+
   updateFriends: (friends: Array<Friend>) => void;
+  updateLastMsg: (cnvId: string, lastMsg: Message) => void;
   updatecnvIds: (userName: string, id: string) => void;
   conversation_ids: any;
 };
@@ -18,9 +21,32 @@ export const friendStore = create<CacheData>(
   (persist as MyPersist)(
     (set) => ({
       friends: null,
+
       conversation_ids: {},
       updateFriends: (friends) => {
-        set({ friends });
+        set((state) => {
+          return { friends };
+        });
+      },
+      updateLastMsg(cnvId, lastMsg) {
+        console.log("ppppppppppppppppppp");
+        set((state) => {
+          const _friends = state.friends?.map((it) => {
+            if (it.conversation_id === cnvId) return { ...it, lastMsg };
+            else return it;
+          });
+          const sorted_friend = _friends?.sort((a, b) => {
+            const timeA = a.lastMsg?.time
+              ? moment(a.lastMsg.time).valueOf()
+              : 0;
+            const timeB = b.lastMsg?.time
+              ? moment(b.lastMsg.time).valueOf()
+              : 0;
+            return timeB - timeA;
+          });
+
+          return { friends: sorted_friend };
+        });
       },
       updatecnvIds: (userName: string, id: string) => {
         set((state) => ({

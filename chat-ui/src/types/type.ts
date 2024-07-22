@@ -4,7 +4,7 @@ export type Friend = {
   userId: number;
   userName: string;
   profilePicture: string;
-  lastMsg: Moment | null;
+  lastMsg: Message;
   conversation_id: string;
 };
 

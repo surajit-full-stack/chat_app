@@ -78,7 +78,7 @@ export default function TopBar({
           </IconButton>
           <ListItemText
             primary={friendInfo?.userName}
-            secondary={friendInfo?.lastMsg ? moment(friendInfo.lastMsg).fromNow() : ""}
+            secondary={"offline"}
           />
           <Search>
             <SearchIconWrapper>

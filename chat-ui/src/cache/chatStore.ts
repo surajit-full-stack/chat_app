@@ -1,6 +1,7 @@
 import { Friend, Message } from "@/types/type";
 import { StateCreator, create } from "zustand";
 import { PersistOptions, persist } from "zustand/middleware";
+import { friendStore } from "./friendsStore";
 
 type ChatBase = {
   [key: string]: Array<Message>;
@@ -27,17 +28,16 @@ export const cacheStore = create<CacheData>(
         if (Array.isArray(chats)) {
           console.log("rewrite");
           set((state) => ({
-            chats: { [convId]: chats },
+            chats: { ...state.chats, [convId]: chats },
           }));
         } else {
-          console.log("push");
-
           const prev = get().chats[convId] ?? [];
           const curr = [...prev, chats];
           set((state) => ({ chats: { ...state.chats, [convId]: curr } }));
         }
       },
       markMsgAsSeen: (convId) => {
+        console.log('llllloooo')
         set((state) => ({
           chats: {
             ...state.chats,
@@ -49,7 +49,6 @@ export const cacheStore = create<CacheData>(
         }));
       },
       markMsgAsSent: (convId) => {
-      
         set((state) => ({
           chats: {
             ...state.chats,
@@ -63,7 +62,7 @@ export const cacheStore = create<CacheData>(
 
       getChats: (convId) => {
         const data = get().chats;
-        return data[convId] ?? [];
+        return data[convId] ?? null;
       },
     }),
     {
