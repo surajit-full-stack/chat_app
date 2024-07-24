@@ -74,6 +74,7 @@ if (cluster.isMaster) {
   io.on("connection", (socket) => {
     socket.on("join-chat", ({ userId }) => {
       console.log("++++", userId);
+      // consume at kafka-consumer service (docker) an DB write
       kafkaProducer
         .send({
           topic: "user-online-status",
@@ -107,12 +108,14 @@ if (cluster.isMaster) {
           console.log("it", it);
         });
     });
+    // when user open chat (processing blue double tick)
     socket.on("seen-msg", ({ senderName, reciverName }) => {
       console.log("seeeeeee", senderName, reciverName);
       kafkaProducer.send({
         topic: "seen-msg",
         messages: [{ value: JSON.stringify({ senderName, reciverName }) }],
       });
+      // update database whenever user seen chat
       kafkaProducer
         .send({
           topic: "seen-msg-db-write",
@@ -124,14 +127,9 @@ if (cluster.isMaster) {
     });
     socket.on("me-online", ({ broadcastIds, onlineUser }) => {
       console.log("broadcastIds", broadcastIds);
-      broadcastIds.forEach((userName) => {
-        let sId = socketIds.get(userName);
-        console.log("sId", sId);
-        if (sId) {
-          io.to(sId).emit("friend-receive-msgs", {
-            friendId: onlineUser,
-          });
-        }
+      kafkaProducer.send({
+        topic: "ACK",
+        messages: [{ value: JSON.stringify({ broadcastIds, onlineUser }) }],
       });
     });
     socket.on("disconnect", () => {
@@ -146,18 +144,7 @@ if (cluster.isMaster) {
       console.log(" new chat", channel);
       // bulk insert payload => batch.messages.map((it) => JSON.parse(it.value))
       try {
-        if (channel == "ACK") {
-          const ack_packet = JSON.parse(message);
-          const { userId, message_id, level, conversation_id } = ack_packet;
-          const messager_socket_id = socketIds.get(userId);
-          if (messager_socket_id) {
-            io.to(messager_socket_id).emit("acknowledgment", {
-              level,
-              message_id,
-              conversation_id,
-            });
-          }
-        } else if (channel == "seen-msg") {
+        if (channel == "seen-msg") {
           console.log("Processing seen-msg message");
           const message_packet = JSON.parse(message);
 
@@ -173,31 +160,57 @@ if (cluster.isMaster) {
           const { senderName, receiverName } = message_packet;
           const _status = "offline";
 
-          const destination_socket_id =
-            message_packet.receiverSId ?? socketIds.get(receiverName);
-          const sender_socket_id =
-            message_packet.senderSId ?? socketIds.get(senderName);
+          const destination_socket_id = socketIds.get(receiverName);
+          const sender_socket_id = socketIds.get(senderName);
 
           console.log("des", destination_socket_id, sender_socket_id);
-          if (sender_socket_id && destination_socket_id) {
-            io.to(sender_socket_id).emit("friend-receive-msgs", {
-              friendId: receiverName,
-            });
-          }
+          // if (sender_socket_id && destination_socket_id) {
+          //   console.log("sent double tick to sender");
+          //   io.to(sender_socket_id).emit("friend-receive-msgs", {
+          //     friendId: receiverName,
+          //   });
+          // }
 
           if (destination_socket_id) {
-            _status = "sent";
-            io.to(destination_socket_id).emit("new-message", {
-              message: [message_packet],
-            });
-            acknowledgment(
-              message_packet.senderName,
-              message_packet.id,
-              message_packet.conversation_id,
-              "sent"
-            );
+            console.log("sent msg to reciever sender");
+            // status "sent" (double tick)
+            kafkaProducer
+              .send({
+                topic: "ACK",
+                messages: [
+                  { value: JSON.stringify({ senderName, receiverName }) },
+                ],
+              })
+              .then((it) => {
+                io.to(destination_socket_id).emit("new-message", {
+                  message: [message_packet],
+                });
+              });
           } else {
             // acknowledgment(message_packet.senderName, message_packet.id, "offline");
+          }
+        } else if (channel === "ACK") {
+          const message_packet = JSON.parse(message);
+          const { senderName, receiverName, onlineUser, broadcastIds } =
+            message_packet;
+
+          if (broadcastIds && onlineUser) {
+            broadcastIds.forEach((userName) => {
+              let sId = socketIds.get(userName);
+              console.log("sId", sId);
+              if (sId) {
+                io.to(sId).emit("friend-receive-msgs", {
+                  friendId: onlineUser,
+                });
+              }
+            });
+          } else if (senderName && receiverName) {
+            const sender_socket_id = socketIds.get(senderName);
+            if (senderName) {
+              io.to(sender_socket_id).emit("friend-receive-msgs", {
+                friendId: receiverName,
+              });
+            }
           }
         }
         resolveOffset(batch.lastOffset);
@@ -209,27 +222,6 @@ if (cluster.isMaster) {
   io.on("error", (error) => {
     console.error("Socket.IO error:", error);
   });
-
-  // message acknowledgement
-  function acknowledgment(userId, message_id, conversation_id, level) {
-    kafkaProducer
-      .send({
-        topic: "ACK",
-        messages: [
-          {
-            value: JSON.stringify({
-              userId,
-              message_id,
-              conversation_id,
-              level,
-            }),
-          },
-        ],
-      })
-      .then((ack) => {
-        console.log("ack snt", ack);
-      });
-  }
 
   // Create Redis client here
   httpServer.listen(process.env.PORT, () => {

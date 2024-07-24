@@ -10,6 +10,7 @@ type CacheData = {
   chats: ChatBase;
   updateChats: (convId: string, chats: Array<Message> | Message) => void;
   markMsgAsSeen: (convId: string) => void;
+  markMsgAsSeenLocal: (convId: string, myUserId: string) => void;
   markMsgAsSent: (convId: string) => void;
   getChats: (convId: string) => Array<Message>;
 };
@@ -37,7 +38,7 @@ export const cacheStore = create<CacheData>(
         }
       },
       markMsgAsSeen: (convId) => {
-        console.log('llllloooo')
+        console.log("llllloooo");
         set((state) => ({
           chats: {
             ...state.chats,
@@ -45,6 +46,19 @@ export const cacheStore = create<CacheData>(
               ...it,
               status: "seen",
             })),
+          },
+        }));
+      },
+      markMsgAsSeenLocal: (convId, myUserId) => {
+        set((state) => ({
+          chats: {
+            ...state.chats,
+            [convId]: get().chats[convId].map((it) => {
+              if (it.receiverName === myUserId)
+                return { ...it, status: "seen" };
+
+              return it;
+            }),
           },
         }));
       },

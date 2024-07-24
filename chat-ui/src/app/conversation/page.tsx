@@ -30,8 +30,15 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     updatecnvIds,
     conversation_ids,
     updateLastMsg,
+    setCurrentConvId,
   } = friendStore();
-  const { getChats, updateChats, markMsgAsSeen, markMsgAsSent } = cacheStore();
+  const {
+    getChats,
+    updateChats,
+    markMsgAsSeen,
+    markMsgAsSent,
+    markMsgAsSeenLocal,
+  } = cacheStore();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const query = useSearchParams();
 
@@ -43,7 +50,10 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     updateChats(cnvid, msg);
     updateLastMsg(cnvid, msg);
   }
-
+  function seeLocalAndRemoteMsg(conversationId: string, msgs: Message[]) {
+    markMsgAsSeenLocal(conversationId, userData.userName);
+    seeMesages(msgs);
+  }
   const fetchConversations = async (friends: Friend[]): Promise<void> => {
     if (friends) {
       const promises = friends.map(async (friend) => {
@@ -87,9 +97,9 @@ const index = ({ params: { friendId } }: { params: Params }) => {
           });
       }
     }
-    const sessionState = !sessionStorage.getItem("FREASH_IN");
+    const sessionState = !!sessionStorage.getItem("FREASH_IN");
     // stopping refetching all friends and chat in a session
-    if (sessionState) {
+    if (!sessionState) {
       fetchFriends().then((friends) => {
         fetchConversations(friends).then(() =>
           sessionStorage.setItem("FREASH_IN", "true")
@@ -99,12 +109,25 @@ const index = ({ params: { friendId } }: { params: Params }) => {
   }, []);
   useEffect(() => {
     console.log("conversationId", conversationId);
+    const handleNewMsg = (msg: any) => {
+      console.log("msg recieved", msg);
+      const singleMsg = msg.message[0];
+      pushChat(singleMsg.conversation_id, singleMsg);
+      console.log("first,,,,", singleMsg.conversation_id, conversationId);
+
+      if (singleMsg.conversation_id == conversationId) {
+        console.log("hoop");
+        seeLocalAndRemoteMsg(singleMsg.conversation_id, msg.message);
+      }
+    };
+
+    _socket.on("new-message", handleNewMsg);
     if (conversationId) {
+      setCurrentConvId(conversationId);
       if (!getChats(conversationId)) {
-        console.log("fetchng  alex chat");
         getConversation(conversationId).then((data) => {
-          setMessages(data);
-          seeMesages(data);
+          seeLocalAndRemoteMsg(conversationId, data);
+
           updateChats(conversationId, data);
 
           // if already friend exists and initiate chat with new user then refetch all friend
@@ -116,8 +139,14 @@ const index = ({ params: { friendId } }: { params: Params }) => {
             }
           }
         });
+      } else {
+        seeLocalAndRemoteMsg(conversationId, getChats(conversationId));
       }
     }
+    return () => {
+      console.log('rem lis')
+      _socket.off("new-message", handleNewMsg);
+    };
   }, [conversationId]);
   function fetchFriends(): Promise<Friend[]> {
     return new Promise((resolve, reject) => {
@@ -157,8 +186,8 @@ const index = ({ params: { friendId } }: { params: Params }) => {
   }
   function meOnline(friends: Friend[]) {
     // will be called later when unseen msg count api will be implemented
-    const sessionState = !sessionStorage.getItem("NET_ONLINE_EMMITED");
-    if (sessionState) {
+    const sessionState = !!sessionStorage.getItem("NET_ONLINE_EMMITED");
+    if (!sessionState) {
       _socket.emit("me-online", {
         broadcastIds: friends.map((it) => it.userName),
         onlineUser: userData.userName,
@@ -182,7 +211,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     }
   }
   const userData = reactLocalStorage.getObject("userData") as any;
-  const [messages, setMessages] = useState<Array<Message>>([]);
+
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
@@ -190,24 +219,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     setSocket(_socket);
     console.log("_socket.id", _socket);
     _socket.removeAllListeners("new-message");
-    _socket.on("new-message", (msg: any) => {
-      console.log("msg recieved", msg);
-      const singleMsg = msg.message[0];
-      pushChat(singleMsg.conversation_id, singleMsg);
-      seeMesages(msg.message);
-    });
-    _socket.on("acknowledgment", ({ level, message_id, conversation_id }) => {
-      console.log("hh", level, message_id, conversation_id);
 
-      let prev = getChats(conversation_id) ?? [];
-      const updatedStatus = prev.map((it) => {
-        if (it.id === message_id) {
-          return { ...it, status: level };
-        }
-        return it;
-      });
-      updateChats(conversation_id, updatedStatus);
-    });
     _socket.on("friend-seen-msgs", ({ friendId }) => {
       const cache_conv_id = conversation_ids[friendId];
       if (!cache_conv_id) {
@@ -220,6 +232,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     });
     _socket.on("friend-receive-msgs", ({ friendId }) => {
       console.log("fr rcv msg");
+
       const cache_conv_id = conversation_ids[friendId];
       if (!cache_conv_id) {
         http
@@ -227,8 +240,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
           .then(({ data: { conversation_id } }) => {
             markMsgAsSent(conversation_id);
           });
-      }
-      markMsgAsSent(cache_conv_id);
+      } else markMsgAsSent(cache_conv_id);
     });
   }, []);
 
@@ -246,10 +258,8 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     socket?.emit("new-msg", payload);
 
     pushChat(conversationId, { ...payload, status: "offline" });
-
-    setMessages((prev) => [...prev, { ...payload, status: "offline" }]);
   };
-  console.log("messeges", messages);
+
   const onMessageEnter = (message: string) => {
     if (!!message) sendMsg(message);
   };

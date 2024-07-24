@@ -5,7 +5,8 @@ import { persist, PersistOptions } from "zustand/middleware";
 
 type CacheData = {
   friends: Array<Friend> | null;
-
+  CURRENT_CONV_ID: string | null;
+  setCurrentConvId: (id: string) => void;
   updateFriends: (friends: Array<Friend>) => void;
   updateLastMsg: (cnvId: string, lastMsg: Message) => void;
   updatecnvIds: (userName: string, id: string) => void;
@@ -21,8 +22,11 @@ export const friendStore = create<CacheData>(
   (persist as MyPersist)(
     (set) => ({
       friends: null,
-
+      CURRENT_CONV_ID: null,
       conversation_ids: {},
+      setCurrentConvId: (id) => {
+        set({ CURRENT_CONV_ID: id });
+      },
       updateFriends: (friends) => {
         set((state) => {
           return { friends };
