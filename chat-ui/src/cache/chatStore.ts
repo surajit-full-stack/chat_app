@@ -8,6 +8,8 @@ type ChatBase = {
 };
 type CacheData = {
   chats: ChatBase;
+  auth: Boolean;
+  setAuth: (stat: Boolean) => Boolean;
   updateChats: (convId: string, chats: Array<Message> | Message) => void;
   markMsgAsSeen: (convId: string) => void;
   markMsgAsSeenLocal: (convId: string, myUserId: string) => void;
@@ -24,7 +26,11 @@ export const cacheStore = create<CacheData>(
   (persist as MyPersist)(
     (set, get) => ({
       chats: {},
-
+      auth: false,
+      setAuth: (stat) => {
+        set({ auth: stat });
+        return stat;
+      },
       updateChats: (convId, chats) => {
         if (Array.isArray(chats)) {
           console.log("rewrite");

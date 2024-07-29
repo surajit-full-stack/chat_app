@@ -1,5 +1,5 @@
 "use client";
-import { Box, Container, Grid } from "@mui/material";
+import { Box, Container, Grid, useMediaQuery } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
 import CssBaseline from "@mui/material/CssBaseline";
@@ -18,7 +18,6 @@ import { reactLocalStorage } from "reactjs-localstorage";
 import moment from "moment";
 import { friendStore } from "@/cache/friendsStore";
 import { cacheStore } from "@/cache/chatStore";
-import { useSearchParams } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
 import { getConversation } from "@/Axios/api";
 import { mainTheme } from "../layout";
@@ -40,8 +39,8 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     markMsgAsSeenLocal,
   } = cacheStore();
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const query = useSearchParams();
-
+  const isSmallScreen = useMediaQuery("(max-width:600px)");
+  const isLargeScreen = useMediaQuery("(min-width:1200px)");
   function storeTimestamp() {
     const timestamp = new Date().toISOString();
     localStorage.setItem("lastOnline", timestamp);
@@ -110,17 +109,15 @@ const index = ({ params: { friendId } }: { params: Params }) => {
   useEffect(() => {
     console.log("conversationId", conversationId);
     const handleNewMsg = (msg: any) => {
-      console.log("msg recieved", msg);
+      console.log(msg);
       const singleMsg = msg.message[0];
       pushChat(singleMsg.conversation_id, singleMsg);
-      console.log("first,,,,", singleMsg.conversation_id, conversationId);
 
       if (singleMsg.conversation_id == conversationId) {
-        console.log("hoop");
         seeLocalAndRemoteMsg(singleMsg.conversation_id, msg.message);
       }
     };
-
+    console.log("_socket", _socket);
     _socket.on("new-message", handleNewMsg);
     if (conversationId) {
       setCurrentConvId(conversationId);
@@ -144,7 +141,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       }
     }
     return () => {
-      console.log('rem lis')
+      console.log("rem lis");
       _socket.off("new-message", handleNewMsg);
     };
   }, [conversationId]);
@@ -218,7 +215,6 @@ const index = ({ params: { friendId } }: { params: Params }) => {
     if (!_socket) return alert("your id unauthorized");
     setSocket(_socket);
     console.log("_socket.id", _socket);
-    _socket.removeAllListeners("new-message");
 
     _socket.on("friend-seen-msgs", ({ friendId }) => {
       const cache_conv_id = conversation_ids[friendId];
@@ -231,8 +227,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       } else markMsgAsSeen(cache_conv_id);
     });
     _socket.on("friend-receive-msgs", ({ friendId }) => {
-      console.log("fr rcv msg");
-
+      // setSTATUS_MAP(friendId, true);
       const cache_conv_id = conversation_ids[friendId];
       if (!cache_conv_id) {
         http
@@ -271,7 +266,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
       <Toaster />
 
       {friendId ? (
-        <Grid sx={{ pt: 2 }} xs={9}>
+        <Grid sx={{ pt: 2, maxWidth: "100%" }} xs={isSmallScreen ? 12 : 9}>
           <Box
             sx={{
               height: "100vh",
@@ -286,6 +281,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
             </Grid>
 
             <Grid
+              className="Conversation-container"
               sx={{
                 flex: "1 1 auto",
                 overflowY: "auto",
@@ -307,7 +303,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
             </Grid>
           </Box>
         </Grid>
-      ) : (
+      ) : isLargeScreen ? (
         <Grid
           display="flex"
           justifyContent="center"
@@ -317,7 +313,7 @@ const index = ({ params: { friendId } }: { params: Params }) => {
         >
           Start Chat
         </Grid>
-      )}
+      ) : null}
     </>
   );
 };

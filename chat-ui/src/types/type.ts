@@ -6,6 +6,7 @@ export type Friend = {
   profilePicture: string;
   lastMsg: Message;
   conversation_id: string;
+  status: boolean;
 };
 
 export type Message = {

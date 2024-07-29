@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import React, { useEffect } from "react";
 import toast from "react-hot-toast";
 import { reactLocalStorage } from "reactjs-localstorage";
+import { cacheStore } from "@/cache/chatStore";
 const page = ({ params: { token } }: { params: Params }) => {
+  const { setAuth } = cacheStore();
   const router = useRouter();
   useEffect(() => {
     http
@@ -15,10 +17,13 @@ const page = ({ params: { token } }: { params: Params }) => {
         },
       })
       .then(({ data: { userData } }) => {
-        reactLocalStorage.setObject("userData",userData);
+        reactLocalStorage.setObject("userData", userData);
+        setAuth(true);
         router.push("/conversation");
       })
       .catch(() => {
+        reactLocalStorage.remove("userData");
+        setAuth(false);
         toast.error("Authorization failed!!!");
       });
   }, [token]);

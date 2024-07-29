@@ -26,11 +26,17 @@ const corsOptions = {
 if (cluster.isMaster) {
   console.log(`Master ${process.pid} is running`);
 
+  const workers = [];
+  workers.push({ kafka_broker_port: process.env.KAFKA_BROKER });
+
   // Fork workers
   for (let i = 0; i < numCPUs; i++) {
+    workers.push({ port: parseInt(process.env.PORT) + i });
     cluster.fork({ PORT: parseInt(process.env.PORT) + i });
   }
+  console.log(`CHAT SERVERs`);
 
+  console.table(workers);
   cluster.on("exit", (worker, code, signal) => {
     console.log(`worker ${worker.process.pid} died`);
   });
@@ -63,10 +69,11 @@ if (cluster.isMaster) {
   // Kafka Producer
   try {
     await kafkaInit();
-    console.log("\nKafka Initiated  chat server...\n");
+    console.table([{ name: "Kafka", status: "ok" }]);
   } catch (error) {
-    throw error;
-    console.log("\nKafka Init Error: \n", error);
+    console.table([
+      { name: "Kafka ", status: `${error.message}` },
+    ]);
   }
 
   //? Handle Socket Connection
@@ -74,24 +81,18 @@ if (cluster.isMaster) {
   io.on("connection", (socket) => {
     socket.on("join-chat", ({ userId }) => {
       console.log("++++", userId);
+
       // consume at kafka-consumer service (docker) an DB write
-      kafkaProducer
-        .send({
-          topic: "user-online-status",
-          messages: [{ value: userId }],
-        })
-        .then((it) => {
-          console.log("it", it);
-        });
+      kafkaProducer.send({
+        topic: "user-online-status",
+        messages: [{ value: JSON.stringify({ userId, status: true }) }],
+      });
+
       socketIds.set(userId, socket.id);
-      console.log("socketIds", socketIds);
+
       socket.userId = userId;
-      // const _to_join = following.map((id) => "base:" + id);
-      // socket.join(_to_join);
-      // console.log("joined", _to_join.join(","));
     });
     socket.on("new-msg", (message_packet) => {
-      console.log("first", message_packet);
       const { senderName, receiverName } = message_packet;
       let senderSId = socketIds.get(senderName);
       if (senderSId) message_packet.senderSId = senderSId;
@@ -99,53 +100,48 @@ if (cluster.isMaster) {
       let receiverSId = socketIds.get(receiverName);
       if (receiverSId) message_packet.receiverSId = receiverSId;
 
-      kafkaProducer
-        .send({
-          topic: "chat",
-          messages: [{ value: JSON.stringify(message_packet) }],
-        })
-        .then((it) => {
-          console.log("it", it);
-        });
+      kafkaProducer.send({
+        topic: "chat",
+        messages: [{ value: JSON.stringify(message_packet) }],
+      });
     });
     // when user open chat (processing blue double tick)
     socket.on("seen-msg", ({ senderName, reciverName }) => {
-      console.log("seeeeeee", senderName, reciverName);
       kafkaProducer.send({
         topic: "seen-msg",
         messages: [{ value: JSON.stringify({ senderName, reciverName }) }],
       });
       // update database whenever user seen chat
-      kafkaProducer
-        .send({
-          topic: "seen-msg-db-write",
-          messages: [{ value: JSON.stringify({ senderName, reciverName }) }],
-        })
-        .then((it) => {
-          console.log("it", it);
-        });
+      kafkaProducer.send({
+        topic: "seen-msg-db-write",
+        messages: [{ value: JSON.stringify({ senderName, reciverName }) }],
+      });
     });
     socket.on("me-online", ({ broadcastIds, onlineUser }) => {
-      console.log("broadcastIds", broadcastIds);
       kafkaProducer.send({
         topic: "ACK",
         messages: [{ value: JSON.stringify({ broadcastIds, onlineUser }) }],
       });
     });
     socket.on("disconnect", () => {
-      console.log("Client disconnected", socket.userId);
+      console.log("-");
       socketIds.delete(socket.userId);
+      kafkaProducer.send({
+        topic: "user-online-status",
+        messages: [
+          { value: JSON.stringify({ userId: socket.userId, status: false }) },
+        ],
+      });
     });
   });
 
   await chat_consumer.run({
     eachMessage: async ({ topic: channel, message: rawMessage }) => {
       const message = rawMessage.value;
-      console.log(" new chat", channel);
+
       // bulk insert payload => batch.messages.map((it) => JSON.parse(it.value))
       try {
         if (channel == "seen-msg") {
-          console.log("Processing seen-msg message");
           const message_packet = JSON.parse(message);
 
           const { reciverName, senderName } = message_packet;
@@ -163,7 +159,6 @@ if (cluster.isMaster) {
           const destination_socket_id = socketIds.get(receiverName);
           const sender_socket_id = socketIds.get(senderName);
 
-          console.log("des", destination_socket_id, sender_socket_id);
           // if (sender_socket_id && destination_socket_id) {
           //   console.log("sent double tick to sender");
           //   io.to(sender_socket_id).emit("friend-receive-msgs", {
@@ -172,13 +167,18 @@ if (cluster.isMaster) {
           // }
 
           if (destination_socket_id) {
-            console.log("sent msg to reciever sender");
             // status "sent" (double tick)
             kafkaProducer
               .send({
                 topic: "ACK",
                 messages: [
-                  { value: JSON.stringify({ senderName, receiverName }) },
+                  {
+                    value: JSON.stringify({
+                      senderName,
+                      receiverName,
+                      id: message_packet.id,
+                    }),
+                  },
                 ],
               })
               .then((it) => {
@@ -197,10 +197,21 @@ if (cluster.isMaster) {
           if (broadcastIds && onlineUser) {
             broadcastIds.forEach((userName) => {
               let sId = socketIds.get(userName);
-              console.log("sId", sId);
+
               if (sId) {
                 io.to(sId).emit("friend-receive-msgs", {
                   friendId: onlineUser,
+                });
+                kafkaProducer.send({
+                  topic: "check-user-online-status",
+                  messages: [
+                    {
+                      value: JSON.stringify({
+                        onlineUser,
+                        queriedId: userName,
+                      }),
+                    },
+                  ],
                 });
               }
             });
@@ -211,6 +222,23 @@ if (cluster.isMaster) {
                 friendId: receiverName,
               });
             }
+          }
+        } else if (channel === "user-online-status") {
+          const message_packet = JSON.parse(message);
+          const { userId, status } = message_packet;
+
+          io.emit(`user-status-${userId}`, {
+            status,
+          });
+        } else if (channel === "check-user-online-status") {
+          const message_packet = JSON.parse(message);
+          const { queriedId, onlineUser } = message_packet;
+          const onlineUserSocketId = socketIds.get(onlineUser);
+
+          if (onlineUserSocketId) {
+            io.to(onlineUserSocketId).emit(`user-status-${queriedId}`, {
+              status: true,
+            });
           }
         }
         resolveOffset(batch.lastOffset);
@@ -224,11 +252,5 @@ if (cluster.isMaster) {
   });
 
   // Create Redis client here
-  httpServer.listen(process.env.PORT, () => {
-    console.log(
-      `Socket Server running on port ${process.env.PORT} : Worker ` +
-        cluster.worker.id,
-      33
-    );
-  });
+  httpServer.listen(process.env.PORT, () => {});
 }

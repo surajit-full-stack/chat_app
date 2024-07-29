@@ -1,25 +1,12 @@
-import { Kafka } from "kafkajs";
+import { Kafka, logLevel } from "kafkajs";
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
-// const kafka = new Kafka({
-//   clientId: "chat-producer",
 
-//   brokers: [process.env.KAFKA_BROKER],
-//   ssl: {
-//     ca: [fs.readFileSync(path.resolve("./ca.pem"), "utf-8")],
-//   },
-//   sasl: {
-//     username: "avnadmin",
-//     password: "AVNS_bnqqmTwAqTaBAm3sHq6",
-//     mechanism: "plain",
-//   },
-// });
 dotenv.config();
-console.log("process.env.KAFKA_BROKER", process.env.KAFKA_BROKER);
+
 const kafka = new Kafka({
   clientId: "chat-server",
   brokers: [process.env.KAFKA_BROKER],
+  logLevel: logLevel.ERROR,
 });
 
 export const producer = kafka.producer();
@@ -46,15 +33,29 @@ export const kafkaInit = async () => {
         {
           topic: "seen-msg-db-write",
         },
+        {
+          topic: "user-online-status",
+        },
+        {
+          topic: "check-user-online-status",
+        },
       ],
     });
     await admin.disconnect();
     await producer.connect();
     await chat_consumer.connect();
-    console.log("\nprod con connected\n\n");
+
     await chat_consumer.subscribe({
-      topics: ["chat", "ACK", "seen-msg", "seen-msg-db-write"],
+      topics: [
+        "chat",
+        "ACK",
+        "seen-msg",
+        "seen-msg-db-write",
+        "user-online-status",
+        "check-user-online-status",
+      ],
     });
+
   } catch (error) {
     throw error;
   }

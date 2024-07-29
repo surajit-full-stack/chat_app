@@ -12,6 +12,7 @@ import { Friend } from "@/types/type";
 import { Avatar, ListItemText } from "@mui/material";
 import ChatMenu from "./Menu";
 import moment from "moment";
+import { friendStore } from "@/cache/friendsStore";
 
 const Search = styled("div")(({ theme }) => ({
   position: "relative",
@@ -60,6 +61,7 @@ export default function TopBar({
 }) {
   // const {userName,lastMsg,profilePicture,userId}=friendInfo
   console.log("friendInfo", friendInfo);
+  
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
@@ -78,9 +80,13 @@ export default function TopBar({
           </IconButton>
           <ListItemText
             primary={friendInfo?.userName}
-            secondary={"offline"}
+            secondary={
+              friendInfo?.userName 
+                ? "online"
+                : "offline"
+            }
           />
-          <Search>
+          {/* <Search>
             <SearchIconWrapper>
               <SearchIcon />
             </SearchIconWrapper>
@@ -88,7 +94,7 @@ export default function TopBar({
               placeholder="Search…"
               inputProps={{ "aria-label": "search" }}
             />
-          </Search>
+          </Search> */}
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ display: { xs: "none", md: "flex" } }}>
             <ChatMenu />

@@ -12,6 +12,37 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Badge } from "@mui/material";
 import { reactLocalStorage } from "reactjs-localstorage";
+import _socket from "@/socket";
+import { styled } from "@mui/material/styles";
+
+const StyledBadge = styled(Badge)(({ theme }) => ({
+  "& .MuiBadge-badge": {
+    backgroundColor: "#44b700",
+    color: "#44b700",
+    boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
+    "&::after": {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      borderRadius: "50%",
+      animation: "ripple 1.2s infinite ease-in-out",
+      border: "1px solid currentColor",
+      content: '""',
+    },
+  },
+  "@keyframes ripple": {
+    "0%": {
+      transform: "scale(.8)",
+      opacity: 1,
+    },
+    "100%": {
+      transform: "scale(2.4)",
+      opacity: 0,
+    },
+  },
+}));
 
 const FriendList = () => {
   const { getChats } = cacheStore();
@@ -19,6 +50,28 @@ const FriendList = () => {
   const userData = reactLocalStorage.getObject("userData") as any;
 
   const { friendId } = useParams();
+  const [STATUS_MAP, setSTATUS_MAP] = React.useState(new Map());
+
+  React.useEffect(() => {
+    friends?.forEach(({ userName }) => {
+      const handleStatusChange = (data: any) => {
+        console.log('data', data)
+        setSTATUS_MAP((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(userName, data.status);
+          return newMap;
+        });
+      };
+      _socket.on(`user-status-${userName}`, handleStatusChange);
+    });
+
+    return () => {
+      friends?.forEach(({ userName }) => {
+        _socket.off(`user-status-${userName}`);
+      });
+    };
+  }, [friends]);
+
 
   return (
     <List sx={{ width: "100%", maxWidth: 360, bgcolor: "background.paper" }}>
@@ -54,7 +107,18 @@ const FriendList = () => {
                 }}
               >
                 <ListItemAvatar>
-                  <Avatar src={profilePicture} />
+                  {STATUS_MAP.get(userName) ? (
+                    <StyledBadge
+                      overlap="circular"
+                      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                      variant="dot"
+                    >
+                      {" "}
+                      <Avatar src={profilePicture} />
+                    </StyledBadge>
+                  ) : (
+                    <Avatar src={profilePicture} />
+                  )}
                 </ListItemAvatar>
                 <ListItemText primary={userName} secondary={lastMsg?.text} />
                 {badge_flag && (

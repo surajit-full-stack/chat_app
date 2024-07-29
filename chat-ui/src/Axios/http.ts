@@ -1,4 +1,5 @@
 import axios, { AxiosError } from "axios";
+import { reactLocalStorage } from "reactjs-localstorage";
 
 const headersList = {
   Accept: "*/*",
@@ -23,6 +24,7 @@ http.interceptors.response.use(
 
         return axios(originalRequest);
       } catch (refreshError) {
+        
         console.error("Failed to refresh access token:", refreshError);
         throw refreshError;
       }
@@ -38,8 +40,9 @@ const refreshToken = async () => {
     await http.get("auth/refreash-token", { withCredentials: true });
   } catch (error: AxiosError | any) {
     if (error?.response?.status === 440) {
-    
-    
+    reactLocalStorage.clear()
+    sessionStorage.clear()
+    window.location.href=process.env.NEXT_PUBLIC_CLIENT_URL || "GO_BACK_AND_CLICK ON CHAT AGAIN"
     }
     console.log("error", error);
   }

@@ -49,6 +49,7 @@ const Conversation = ({ messages }: ConverSationProps) => {
     <Box sx={{ width: "100%", height: "auto" }}>
       {messages.length > 0 && (
         <Box
+          id="conversation-box"
           sx={{
             pt: 2,
             width: "100%",
@@ -80,7 +81,7 @@ const Conversation = ({ messages }: ConverSationProps) => {
             ? alpha(mainTheme.palette.success.dark, 0.45)
             : alpha(mainTheme.palette.common.white, 0.07);
         return (
-          <Stack spacing={1}>
+          <Stack spacing={1} padding={1}>
             {" "}
             <Box
               display="flex"

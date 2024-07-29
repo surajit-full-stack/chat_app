@@ -1,4 +1,5 @@
 import { Friend, Message } from "@/types/type";
+import { stat } from "fs";
 import moment, { Moment } from "moment";
 import { create, StateCreator } from "zustand";
 import { persist, PersistOptions } from "zustand/middleware";
@@ -20,7 +21,7 @@ type MyPersist = (
 
 export const friendStore = create<CacheData>(
   (persist as MyPersist)(
-    (set) => ({
+    (set, get) => ({
       friends: null,
       CURRENT_CONV_ID: null,
       conversation_ids: {},
